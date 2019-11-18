@@ -139,7 +139,7 @@ class File:
             return self.name.strip() + '.' + self.ext.strip()
         return self.name.strip()
 
-    def get_file(self):
+    def get_file_bytes(self):
         """Return a record of file in bytes"""
         result = bytes(self.name, encoding='ansi') + bytes(self.ext, encoding='ansi')
         result += self.size.to_bytes(4, byteorder='big') + int(self.attr, 2).to_bytes(1, byteorder='big')

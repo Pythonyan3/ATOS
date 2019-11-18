@@ -32,7 +32,7 @@ class Formatting:
         super_block += self.__fat_copy_offset.to_bytes(4, byteorder='big')
         super_block += self.__main_dir_offset.to_bytes(4, byteorder='big')
         super_block += self.__data_area_offset.to_bytes(4, byteorder='big')
-        super_block += self.__main_dir.get_file()
+        super_block += self.__main_dir.get_file_bytes()
         return super_block
 
     def mk_fat(self):

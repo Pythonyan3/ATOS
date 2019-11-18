@@ -36,3 +36,27 @@ class PermissionsDenied(Exception):
 
     def __str__(self):
         return self.txt
+
+
+class WrongParams(Exception):
+    def __init__(self):
+        self.txt = 'Wrong params!'
+
+    def __str__(self):
+        return self.txt
+
+
+class UserExists(Exception):
+    def __init__(self, login):
+        self.txt = 'User with login "{}" is already exists!'.format(login)
+
+    def __str__(self):
+        return self.txt
+
+
+class UserNotFound(Exception):
+    def __init__(self, login):
+        self.txt = 'User with login "{}" not found!'.format(login)
+
+    def __str__(self):
+        return self.txt

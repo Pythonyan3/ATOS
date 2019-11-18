@@ -25,7 +25,7 @@ class Terminal:
                     command = user_command.pop(0)
                     function = self.commands(command)
                     if function:
-                        function(list(filter(None, set(user_command))))
+                        function(list(filter(None, user_command)))
                     else:
                         print(colored('Unknown command!', 'red'))
             else:
@@ -46,6 +46,8 @@ class Terminal:
         return {
             'mkfile': self.mkfile,
             'mkdir': self.mkdir,
+            'mkuser': self.mkuser,
+            'rmuser': self.rmuser,
             'ls': self.ls,
             'pwd': self.pwd,
             'cd': self.cd,
@@ -72,6 +74,13 @@ class Terminal:
                     print(colored(e, 'red'))
                 except exeptions.FileNotExists as e:
                     print(colored(e, 'red'))
+
+    def mkuser(self, params):
+        self.atos.make_user(params)
+
+    def rmuser(self, params):
+        if len(params) == 1:
+            self.atos.remove_user(params[0])
 
     def ls(self, params):
         x, files = self.atos.show_dir(params[0]) if params else self.atos.show_dir(self.atos.location)

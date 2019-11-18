@@ -72,19 +72,29 @@ class Atos:
         """Logout"""
         self.user = None
 
-    def load_users(self):
-        """Returns a dict of user's accounts"""
-        users = dict()
-        rwx, main_dir = self.get_directory('')
-        file = self.read_directory(main_dir).get('users')
-        data = self.read_file(file)
-        for i in range(len(data) // 32):
-            user = User(data[i-1 * 32:i-1+32])
-            users[user.login.strip()] = user
-        return users
+    def make_user(self, args):
+        """Makes user and writes in file"""
+        if not self.user.role:
+            raise exeptions.PermissionsDenied()
+        if len(args) != 3:
+            raise exeptions.NotEnoughParams()
+        if not args[2].isdigit():
+            raise exeptions.WrongParams()
+        if self.users.get(args[0].strip()):
+            raise exeptions.UserExists(args[0].strip())
+        password = hashlib.md5(bytes(args[1], 'ansi')).digest()
+        user = User(login=args[0].strip(), password=password, role=int(args[2]), id=len(self.users) + 1)
+        self.users[user.login.strip()] = user
+        self.save_users()
 
-    def make_user(self):
-        pass
+    def remove_user(self, login):
+        login = login.strip()
+        if not self.users.get(login):
+            raise exeptions.UserNotFound(login)
+        if not self.user.role or login == 'root' or self.user.login.strip() == login:
+            raise exeptions.PermissionsDenied()
+        self.users.pop(login)
+        self.save_users()
 
     """System functions"""
 
@@ -133,6 +143,17 @@ class Atos:
             # write in FAT copy last cluster
             file.seek(self.super_block.fat_copy_offset + (clusters[-1] - 1) * 4)
             file.write((self.super_block.clusters_count + 1).to_bytes(4, byteorder='big'))
+
+    def set_clusters_free(self, clusters):
+        """Set cluster's status free"""
+        with open('os.txt', 'r+b') as file:
+            for cluster in clusters:
+                # write in FAT
+                file.seek(self.super_block.fat_offset + (cluster - 1) * 4)
+                file.write((0).to_bytes(4, byteorder='big'))
+                # write in FAT copy
+                file.seek(self.super_block.fat_copy_offset + (cluster - 1) * 4)
+                file.write((0).to_bytes(4, byteorder='big'))
 
     def read_directory(self, f):
         """Returns a list of files"""
@@ -196,7 +217,7 @@ class Atos:
                 record = file.read(self.super_block.record_size)
                 if record[:1] == b' ':
                     file.seek(-self.super_block.record_size, 1)
-                    file.write(f.get_file())
+                    file.write(f.get_file_bytes())
                     return True
 
     def write_data(self, clusters, data):
@@ -207,6 +228,27 @@ class Atos:
                 data = data[self.super_block.cluster_size:]
             file.seek((clusters[-1] - 1) * self.super_block.cluster_size)
             file.write(data)
+
+    def load_users(self):
+        """Returns a dict of user's accounts"""
+        users = dict()
+        rwx, main_dir = self.get_directory('')
+        file = self.read_directory(main_dir).get('users')
+        data = self.read_file(file)
+        for i in range(1, len(data) // 32 + 1):
+            user = User(user_bytes=data[(i-1) * 32:i*32])
+            users[user.login.strip()] = user
+        return users
+
+    def save_users(self):
+        data = b''
+        for user in self.users.values():
+            data += user.get_user_bytes()
+        rwx, main_dir = self.get_directory('')
+        file = self.read_directory(main_dir).get('users')
+        clusters = self.get_clusters_seq(file.first_cluster)
+        data += b' ' * (len(clusters) * self.super_block.cluster_size - len(data))
+        self.write_data(clusters, data)
 
     def path_conversion(self, path):
         if path and path != '/':
