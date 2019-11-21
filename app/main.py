@@ -1,7 +1,7 @@
 import os.path
 from terminal import Terminal
 from colorama import init
-
+from formatting import Formatting
 
 if __name__ == "__main__":
     init()

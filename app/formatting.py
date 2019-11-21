@@ -1,3 +1,5 @@
+import hashlib
+
 from file import File
 import math
 
@@ -40,23 +42,28 @@ class Formatting:
         eng_clusters = (self.__clusters_count + 2).to_bytes(4, byteorder='big') * count
         start = count + 1
         main_dir_count = self.__main_dir_size // self.__cluster_size
-        for i in range(start + 1, start+main_dir_count):
-            eng_clusters += (i).to_bytes(4, byteorder='big')
+        for i in range(start, start+main_dir_count-1):
+            eng_clusters += (i+1).to_bytes(4, byteorder='big')
         eng_clusters += (self.__clusters_count + 1).to_bytes(4, byteorder='big') * 2
-        return eng_clusters + (0).to_bytes(4, byteorder='big') * (self.__clusters_count - count - main_dir_count - 1)
+        users_cluster = len(eng_clusters) // 4
+        eng_clusters += (0).to_bytes(4, byteorder='big') * (self.__clusters_count - count - main_dir_count - 1)
+        return [users_cluster, eng_clusters]
 
     def formatting(self):
         """Create file of FS and fill it"""
         sb = self.mk_super_block()
         sb = sb + b' ' * (self.__cluster_size - len(sb))
-        # data = b'root' + b' ' * 11 + hashlib.md5(b'314ton').digest() + (1).to_bytes(1, byteorder='big') + \
-        #       (1).to_bytes(1, byteorder='big')
 
+        # file = File('users', '', '1111111', clusters[0], self.user.id, data, attr)
+        data = b'root' + b' ' * 10 + hashlib.md5(b'314ton').digest() + (1).to_bytes(1, byteorder='big') + \
+               (1).to_bytes(1, byteorder='big')
+        clust, fat = self.mk_fat()
+        f = File('users', '', '0110100', clust, 1, data, '111')
         try:
             with open('os.txt', 'wb') as file:
                 file.write(sb)
-                file.write(self.mk_fat() * 2)
-                file.write(b' ' * self.__main_dir_size)
-                file.write(b' ' * (self.__hd_size - self.__data_area_offset))
+                file.write(fat * 2)
+                file.write(f.get_file_bytes() + b' ' * (self.__main_dir_size - len(f.get_file_bytes())))
+                file.write(data + b' ' * (self.__hd_size - self.__data_area_offset - len(data)))
         except Exception:
             print('Something wrong!')

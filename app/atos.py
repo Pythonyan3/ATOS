@@ -28,13 +28,11 @@ class Atos:
 
     def make_file(self, path, mod='0110100', uid=1, data='', attr='000'):
         """Make a new file"""
-        full_path = self.path_conversion(path)   # built full path
-        pos = full_path.rfind('/')
-        full_path, full_name = full_path[:pos], full_path[pos+1:]    # divide path and name
-        name, ext = self.parse_ext(full_name)   # parse extension
-        rwx, directory = self.get_directory(full_path)    # get target directory
-        if self.read_directory(directory).get(full_name):  # check existed files
-            raise exeptions.FileExists(full_name)
+        path, name = self.slice_path(path)  # slice path and name
+        directory = self.check_dir_w_permission(path)
+        if self.read_directory(directory).get(name):  # check existed files
+            raise exeptions.FSExeption('File with name "{}" is already exist!'.format(name))
+        name, ext = self.parse_file_name(name)  # parse file name
         count = self.get_cluster_count(data) if data else 1  # get required cluster's count
         clusters = self.get_free_clusters(count)    # get numbers of free clusters
         self.write_record(File(name, ext, mod, clusters[0], self.user.id, data, attr), directory)
@@ -43,45 +41,67 @@ class Atos:
             self.write_data(clusters, data)
 
     def remove_file(self, path):
-        pass
+        file, directory = self.check_file_w_permission(path)
+        if file.is_dir():
+            for f in self.read_directory(file).values():
+                try:
+                    self.remove_file(path + '/' + f.full_name.strip())
+                except exeptions.FSExeption:
+                    print(colored('{}: Permission denied!'.format(f.full_name.strip()), 'red'))
+            if not self.read_directory(file).values():
+                self.remove_record(file, directory)
+                clusters = self.get_clusters_seq(file.first_cluster)
+                self.set_clusters_free(clusters)
+        else:
+            self.remove_record(file, directory)
+            clusters = self.get_clusters_seq(file.first_cluster)
+            self.set_clusters_free(clusters)
+
+    def move_file(self, source_path, target_path):
+        source_file, source_directory = self.check_file_w_permission(source_path)
+        target_path, target_name = self.slice_path(target_path)
+        target_directory = self.check_dir_w_permission(target_path)
+        self.remove_record(source_file, source_directory)
+        source_file.name, source_file.ext = self.parse_file_name(target_name)
+        self.write_record(source_file, target_directory)
 
     def change_directory(self, path):
         path = self.path_conversion(path)
-        rwx, directory = self.get_directory(path)  # get target directory
+        directory = self.check_dir_x_permission(path)
         self.current_dir = directory
         self.location = path
 
     def show_dir(self, path):
         """Returns files of directory and x permission"""
-        full_path = self.path_conversion(path)
-        rwx, directory = self.get_directory(full_path)
-        r, w, x = self.parse_rwx(rwx)
-        if r == '1':
-            return [x, self.read_directory(directory)]
-        raise exeptions.PermissionsDenied()
+        path = self.path_conversion(path)
+        directory = self.check_dir_r_permission(path)
+        try:
+            self.check_dir_x_permission(path)
+            x = '1'
+        except exeptions.FSExeption:
+            x = '0'
+        return [x, self.read_directory(directory)]
 
     def login(self, login, password):
         """Authorization"""
         user = self.users.get(login)
-        if user and user.password == hashlib.md5(bytes(password, 'ansi')).digest():
+        if user and user.password == hashlib.md5(bytes(password, 'ansi')).digest() and user.id != 0:
             self.user = user
         else:
-            raise exeptions.IncorrectLoginOrPass()
+            raise exeptions.FSExeption('Incorrect login or password!')
 
     def logout(self):
         """Logout"""
+        self.location = ''
+        self.rwx, self.current_dir = self.get_directory(self.location)
         self.user = None
 
     def make_user(self, args):
         """Makes user and writes in file"""
         if not self.user.role:
-            raise exeptions.PermissionsDenied()
-        if len(args) != 3:
-            raise exeptions.NotEnoughParams()
-        if not args[2].isdigit():
-            raise exeptions.WrongParams()
+            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user.login.strip()))
         if self.users.get(args[0].strip()):
-            raise exeptions.UserExists(args[0].strip())
+            raise exeptions.FSExeption('User with login "{}", already exist!'.format(args[0].strip()))
         password = hashlib.md5(bytes(args[1], 'ansi')).digest()
         user = User(login=args[0].strip(), password=password, role=int(args[2]), id=len(self.users) + 1)
         self.users[user.login.strip()] = user
@@ -90,25 +110,59 @@ class Atos:
     def remove_user(self, login):
         login = login.strip()
         if not self.users.get(login):
-            raise exeptions.UserNotFound(login)
+            raise exeptions.FSExeption('User with login "{}" not found!'.format(login))
         if not self.user.role or login == 'root' or self.user.login.strip() == login:
-            raise exeptions.PermissionsDenied()
-        self.users.pop(login)
+            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user.login.strip()))
+        self.users[login.strip()].id = 0
         self.save_users()
+
+    def change_mod(self, path, mod):
+        full_path, full_name = self.slice_path(path)
+        rwx, directory = self.get_directory(full_path)
+        file = self.read_directory(directory).get(full_name)
+        if not file:
+            raise exeptions.FSExeption('No such file or directory!')
+        if file.uid != self.user.id and not self.user.role:
+            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user.login.strip()))
+        file.mod = file.mod[:1] + self.parse_rwx(int(mod[0])) + self.parse_rwx(int(mod[1]))
+        self.rewrite_record(file, directory)
+
+    def change_attr(self, path, attr):
+        full_path, full_name = self.slice_path(path)
+        rwx, directory = self.get_directory(full_path)
+        file = self.read_directory(directory).get(full_name)
+        if not file:
+            raise exeptions.FSExeption('No such file or directory!')
+        if file.uid != self.user.id and not self.user.role:
+            raise exeptions.FSExeption('{}: Permissions denied!'.format(self.user.login.strip()))
+        file.attr = self.parse_rwx(int(attr))
+        self.rewrite_record(file, directory)
+
+    def open(self, path):
+        file, directory = self.check_file_r_permission(path)
+        path, name = self.slice_path(path)
+        directory = self.check_dir_x_permission(path)
+        return str(self.read_file(file), encoding='ansi')
 
     """System functions"""
 
     def get_free_clusters(self, count=1):
         """Getting numbers of free clusters. Return a list of free clusters numbers"""
         clusters = list()
-        with open('os.txt', 'rb') as file:
+        with open('os.txt', 'r+b') as file:
             file.seek(self.super_block.fat_offset)
             while len(clusters) < count and file.tell() != self.super_block.fat_copy_offset:
                 if int.from_bytes(file.read(4), byteorder='big') == 0:
                     clusters.append(((file.tell() - self.super_block.fat_offset) // 4))
+                    self.clear_data_area((clusters[-1]-1) * self.super_block.cluster_size)
         if len(clusters) == count:
             return clusters
         print(colored('Not enough memory!', 'red'))
+
+    def clear_data_area(self, offset):
+        with open('os.txt', 'r+b') as file:
+            file.seek(offset)
+            file.write(b' ' * self.super_block.cluster_size)
 
     def get_clusters_seq(self, first_cluster):
         result = [first_cluster]
@@ -156,7 +210,7 @@ class Atos:
                 file.write((0).to_bytes(4, byteorder='big'))
 
     def read_directory(self, f):
-        """Returns a list of files"""
+        """Returns a dict of files"""
         result = dict()
         clusters = self.get_clusters_seq(f.first_cluster)
         with open('os.txt', 'rb') as file:
@@ -177,16 +231,17 @@ class Atos:
         return result
 
     def read_file(self, f):
+        """Returns file's data"""
         data = b''
         clusters = self.get_clusters_seq(f.first_cluster)
         with open('os.txt', 'rb') as file:
             for cluster in clusters:
                 file.seek((cluster-1) * self.super_block.cluster_size)
-                data += file.read(self.super_block.cluster_size).strip()
-        return data
+                data += file.read(self.super_block.cluster_size)
+        return data.rstrip()
 
     def get_directory(self, path):
-        """Returns a File object of required directory"""
+        """Returns permissions and File object of required directory"""
         rwx = 7
         path_list = path.split('/')
         path_list.pop(0)
@@ -198,7 +253,7 @@ class Atos:
                 rwx = self.get_mod(directory) & rwx
                 files = self.read_directory(directory)
             else:
-                raise exeptions.FileNotExists
+                raise exeptions.FSExeption('No such file or directory!')
         return [rwx, directory]
 
     def write_record(self, f, directory):
@@ -217,6 +272,44 @@ class Atos:
                 record = file.read(self.super_block.record_size)
                 if record[:1] == b' ':
                     file.seek(-self.super_block.record_size, 1)
+                    file.write(f.get_file_bytes())
+                    return True
+
+    def rewrite_record(self, f, directory):
+        """Write a file record"""
+        clusters = self.get_clusters_seq(directory.first_cluster)
+        with open('os.txt', 'r+b') as file:
+            offset = (clusters.pop(0) - 1) * self.super_block.cluster_size
+            file.seek(offset)
+            while True:
+                if file.tell() == offset + self.super_block.cluster_size:
+                    if clusters:
+                        offset = (clusters.pop(0) - 1) * self.super_block.cluster_size
+                        file.seek(offset)
+                    else:
+                        return None
+                fil = File(file_bytes=file.read(self.super_block.record_size))
+                if fil.name.strip() == f.name.strip():
+                    file.seek(-self.super_block.record_size, 1)
+                    file.write(f.get_file_bytes())
+                    return True
+
+    def remove_record(self, f, directory):
+        clusters = self.get_clusters_seq(directory.first_cluster)
+        with open('os.txt', 'r+b') as file:
+            offset = (clusters.pop(0) - 1) * self.super_block.cluster_size
+            file.seek(offset)
+            while True:
+                if file.tell() == offset + self.super_block.cluster_size:
+                    if clusters:
+                        offset = (clusters.pop(0) - 1) * self.super_block.cluster_size
+                        file.seek(offset)
+                    else:
+                        return None
+                curr_file = File(file_bytes=file.read(self.super_block.record_size))
+                if curr_file.full_name == f.full_name:
+                    file.seek(-self.super_block.record_size, 1)
+                    f.name = ' ' + f.name[1:]
                     file.write(f.get_file_bytes())
                     return True
 
@@ -251,27 +344,81 @@ class Atos:
         self.write_data(clusters, data)
 
     def path_conversion(self, path):
+        """Returns full path to file"""
         if path and path != '/':
             path = self.location + '/' + path if path[0] != '/' else path
         elif path == '/':
             path = ''
         return path
 
-    def get_mod(self, directory):
-        if directory.uid == self.user.id:
-            mod = int(directory.mod[1:4], 2)
+    def get_mod(self, file):
+        """Returns file permissions"""
+        if file.uid == self.user.id:
+            mod = int(file.mod[1:4], 2)
         else:
-            mod = int(directory.mod[4:], 2)
+            mod = int(file.mod[4:], 2)
         return mod
 
     @staticmethod
-    def parse_ext(name):
+    def parse_file_name(name):
+        """Returns name and extension"""
         pos = name.rfind('.')
         ext = ''
         if (-1) < pos < len(name)-1:
             ext = name[pos+1:]
             name = name[:pos]
         return [name, ext]
+
+    def check_dir_r_permission(self, path):
+        rwx, directory = self.get_directory(path)
+        r, w, x = self.parse_rwx(rwx)
+        if r != '1':
+            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user.login.strip()))
+        return directory
+
+    def check_file_r_permission(self, path):
+        path, name = self.slice_path(path)
+        rwx, directory = self.get_directory(path)
+        file = self.read_directory(directory).get(name)
+        if not file or file.is_dir():
+            raise exeptions.FSExeption('{}: File not found!'.format(name))
+        rwx = self.get_mod(file)
+        r, w, x = self.parse_rwx(rwx)
+        if r == '0' and not self.user.role:
+            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user.login.strip()))
+        return [file, directory]
+
+    def check_dir_w_permission(self, path):
+        rwx, directory = self.get_directory(path)  # checks directories sequence permissions
+        r, w, x = self.parse_rwx(rwx)
+        if w == '0' and not self.user.role:
+            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user.login.strip()))
+        return directory
+
+    def check_file_w_permission(self, path):
+        path, name = self.slice_path(path)
+        directory = self.check_dir_w_permission(path)
+        file = self.read_directory(directory).get(name)
+        if not file:
+            raise exeptions.FSExeption('{}: File not found!'.format(name))
+        rwx = self.get_mod(file)    # check target file permissions
+        r, w, x = self.parse_rwx(rwx)
+        if w == '0' and not self.user.role:
+            raise exeptions.FSExeption('{}: Permission denied'.format(self.user.login.strip()))
+        return [file, directory]
+
+    def check_dir_x_permission(self, path):
+        rwx, directory = self.get_directory(path)  # get target directory
+        r, w, x = self.parse_rwx(rwx)
+        if x == '0':
+            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user.login.strip()))
+        return directory
+
+    def slice_path(self, path):
+        """Returns path to file and file name"""
+        full_path = self.path_conversion(path)  # built full path
+        last_slash = full_path.rfind('/')   # get pos of last slash
+        return [full_path[:last_slash], full_path[last_slash+1:].strip()]    # return path and name
 
     @staticmethod
     def parse_rwx(rwx):
