@@ -3,23 +3,19 @@ import getpass
 import os
 import atos
 import exeptions
-from formatting import Formatting
 from termcolor import colored
 
 
 class Terminal:
 
     def __init__(self, path):
-
-        if os.path.isfile(path):
-            self.atos = atos.Atos(path)
-            # self.make_users()
+        self.atos = atos.Atos(path)
 
     def run(self):
         while True:
             if self.atos.user:
-                print(colored(self.atos.user, 'green') + colored('~' + self.atos.location, 'blue') + ": ", end='')
-                string = input()
+                label = colored(self.atos.user, 'green') + colored('~' + self.atos.location, 'blue') + ": "
+                string = self.get_string(label)
                 if string:
                     user_command = string.split(' ')
                     command = user_command.pop(0)
@@ -48,11 +44,13 @@ class Terminal:
             'mkdir': self.mkdir,
             'rm': self.rm,
             'mv': self.mv,
+            'cp': self.cp,
             'mkuser': self.mkuser,
             'rmuser': self.rmuser,
             'chmod': self.chmod,
             'chattr': self.chattr,
             'open': self.open,
+            'write': self.write,
             'ls': self.ls,
             'pwd': self.pwd,
             'cd': self.cd,
@@ -62,29 +60,31 @@ class Terminal:
         }.get(command)
 
     def mkfile(self, params):
-        if self.check_file_name(params):
-            for param in params:
-                try:
-                    self.atos.make_file(param)
-                except exeptions.FSExeption as e:
-                    print(colored(e, 'red'))
-
-    def mkdir(self, params):
-        if self.check_file_name(params):
-            for param in params:
-                try:
-                    self.atos.make_file(path=param, mod='1111101')
-                except exeptions.FSExeption as e:
-                    print(colored(e, 'red'))
-
-    def rm(self, params):
-        if len(params) == 1:
+        if not params:
+            print(colored('Not enough params!', 'red'))
+        for param in params:
             try:
-                self.atos.remove_file(params[0])
+                self.atos.make_file(param)
             except exeptions.FSExeption as e:
                 print(colored(e, 'red'))
-        else:
-            print(colored('Wrong params!', 'red'))
+
+    def mkdir(self, params):
+        if not params:
+            print(colored('Not enough params!', 'red'))
+        for param in params:
+            try:
+                self.atos.make_file(path=param, mod='1111101')
+            except exeptions.FSExeption as e:
+                print(colored(e, 'red'))
+
+    def rm(self, params):
+        if not params:
+            print(colored('Not enough params!', 'red'))
+        for param in params:
+            try:
+                self.atos.remove_file(param)
+            except exeptions.FSExeption as e:
+                print(colored(e, 'red'))
 
     def mv(self, params):
         if len(params) == 2:
@@ -95,11 +95,26 @@ class Terminal:
         else:
             print(colored('Wrong params!', 'red'))
 
+    def cp(self, params):
+        if params:
+            try:
+                if len(params) == 2:
+                    self.atos.copy_file(params[0], params[1])
+                elif len(params) == 1:
+                    self.atos.copy_file(params[0], params[0])
+            except exeptions.FSExeption as e:
+                print(colored(e, 'red'))
+        else:
+            print(colored('Wrong params!', 'red'))
+
     def mkuser(self, params):
-        try:
-            self.atos.make_user(params)
-        except exeptions.FSExeption as e:
-            print(colored(e, 'red'))
+        if len(params) == 3 and params[2].isdigit():
+            try:
+                self.atos.make_user(params)
+            except exeptions.FSExeption as e:
+                print(colored(e, 'red'))
+        else:
+            print(colored('Wrong params!'))
 
     def rmuser(self, params):
         if len(params) == 1:
@@ -110,32 +125,55 @@ class Terminal:
 
     def chmod(self, params):
         if len(params) == 2:
-            self.atos.change_mod(params[1], params[0])
+            try:
+                self.atos.change_mod(params[1], params[0])
+            except exeptions.FSExeption as e:
+                print(colored(e, 'red'))
+        else:
+            print(colored('Wrong params!', 'red'))
 
     def chattr(self, params):
-        if len(params) == 2:
-            self.atos.change_attr(params[1], params[0])
+        if len(params) == 2 and params[0].isdigit():
+            try:
+                self.atos.change_attr(params[1], params[0])
+            except exeptions.FSExeption as e:
+                print(colored(e, 'red'))
         else:
-            print(colored('Not enough params!', 'red'))
+            print(colored('Wrong params!', 'red'))
 
     def open(self, params):
         if params:
             try:
-                print(self.atos.open(params[0]))
+                data = self.atos.open(params[0])
+                if data:
+                    print(data)
             except exeptions.FSExeption as e:
                 print(colored(e, 'red'))
+        else:
+            print(colored('Not enough params!', 'red'))
+
+    def write(self, params):
+        try:
+            self.atos.write_permission(params[0])
+            data = self.get_strings()
+            self.atos.write(params[0], data)
+        except exeptions.FSExeption as e:
+            print(colored(e, 'red'))
 
     def ls(self, params):
-        x, files = self.atos.show_dir(params[0]) if params else self.atos.show_dir(self.atos.location)
-        for file in files.values():
-            if file.attr[2] == '1' and not self.atos.user.role:
-                continue
-            if file.mod[0] == '1':
-                string = file if x == '1' else file.full_name
-                print(colored(string, 'magenta'))
-            else:
-                string = file if x == '1' else file.full_name
-                print(string)
+        try:
+            x, files = self.atos.show_dir(params[0]) if params else self.atos.show_dir(self.atos.location)
+            for file in files.values():
+                if file.attr[2] == '1' and not self.atos.user.role:
+                    continue
+                if file.mod[0] == '1':
+                    string = file if x == '1' else file.full_name
+                    print(colored(string, 'magenta'))
+                else:
+                    string = file if x == '1' else file.full_name
+                    print(string)
+        except exeptions.FSExeption as e:
+            print(colored(e, 'red'))
 
     def pwd(self, params):
         path = self.atos.location
@@ -164,19 +202,16 @@ class Terminal:
                 return text.strip()
 
     @staticmethod
-    def formatting(self):
-        formatter = Formatting()
-        formatter.formatting()
+    def get_strings():
+        strings = list()
+        while True:
+            try:
+                strings.append(input())
+            except EOFError:
+                break
+        return '\n'.join(strings)
 
-    @staticmethod
-    def check_file_name(names):
-        if names:
-            for name in names:
-                if name.find('//') != -1:
-                    print(colored(name + ': Wrong name', 'red'))    # if name contains '//'
-                    return False
-                elif not 0 < len(name.split('/')[-1]) <= 20:    # if len not between 1-20
-                    print(colored(name + ': Wrong name', 'red'))
-                    return False
-            return True
-        print(colored('Not enough params', 'red'))
+    def formatting(self, params):
+        print('Formatting...')
+        self.atos.fs_formatting()
+        print('Done.')

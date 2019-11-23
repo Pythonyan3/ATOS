@@ -21,7 +21,7 @@ class Formatting:
         self.__main_dir_offset = self.__fat_copy_offset + self.__clusters_count * 4
         self.__data_area_offset = self.__main_dir_offset + self.__main_dir_size
         first_cluster = self.__main_dir_offset//self.__cluster_size+1
-        self.__main_dir = File(name='main_dir', mod='1111111', first_cluster=first_cluster, attr='111')
+        self.__main_dir = File(name='main_dir', mod='1111111', first_cluster=first_cluster, attr='000')
 
     def mk_super_block(self):
         """Make a byte string of super block"""
