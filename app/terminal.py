@@ -3,6 +3,7 @@ import getpass
 import os
 import atos
 import exeptions
+from file import File
 from termcolor import colored
 
 
@@ -30,14 +31,6 @@ class Terminal:
                 except exeptions.FSExeption as e:
                     print(colored(e, 'red'))
 
-    def authorization(self):
-        login = self.get_string(colored('Enter your login: ', 'white'))
-        password = getpass.getpass('Enter your password: ')
-        return self.atos.login(login, password)
-
-    def logout(self, params):
-        self.atos.logout()
-
     def commands(self, command):
         return {
             'mkfile': self.mkfile,
@@ -51,12 +44,14 @@ class Terminal:
             'chattr': self.chattr,
             'open': self.open,
             'write': self.write,
+            'append': self.append,
             'ls': self.ls,
             'pwd': self.pwd,
             'cd': self.cd,
             'logout': self.logout,
-            'fsform': self.formatting,
-            'clear': self.clear
+            'fsformat': self.formatting,
+            'clear': self.clear,
+            'help': self.help
         }.get(command)
 
     def mkfile(self, params):
@@ -160,18 +155,23 @@ class Terminal:
         except exeptions.FSExeption as e:
             print(colored(e, 'red'))
 
+    def append(self, params):
+        try:
+            self.atos.write_permission(params[0])
+            data = self.get_strings()
+            self.atos.append(params[0], data)
+        except exeptions.FSExeption as e:
+            print(colored(e, 'red'))
+
     def ls(self, params):
         try:
-            x, files = self.atos.show_dir(params[0]) if params else self.atos.show_dir(self.atos.location)
-            for file in files.values():
-                if file.attr[2] == '1' and not self.atos.user.role:
-                    continue
-                if file.mod[0] == '1':
-                    string = file if x == '1' else file.full_name
-                    print(colored(string, 'magenta'))
+            files = self.atos.show_dir(params[0]) if params else self.atos.show_dir(self.atos.location)
+            for file in files:
+                if type(file) == File:
+                    color = 'magenta' if file.mod[0] == '1' else 'white'
+                    print(colored(file, color))
                 else:
-                    string = file if x == '1' else file.full_name
-                    print(string)
+                    print(file)
         except exeptions.FSExeption as e:
             print(colored(e, 'red'))
 
@@ -188,6 +188,14 @@ class Terminal:
                 print(colored('Wrong params!', 'red'))
         except exeptions.FSExeption as e:
             print(colored(e, 'red'))
+
+    def authorization(self):
+        login = self.get_string(colored('Enter your login: ', 'white'))
+        password = getpass.getpass('Enter your password: ')
+        return self.atos.login(login, password)
+
+    def logout(self, params):
+        self.atos.logout()
 
     @staticmethod
     def clear(params):
@@ -212,6 +220,34 @@ class Terminal:
         return '\n'.join(strings)
 
     def formatting(self, params):
-        print('Formatting...')
-        self.atos.fs_formatting()
-        print('Done.')
+        try:
+            if params:
+                if len(params) == 2 and params[0].isdigit() and params[1].isdigit():
+                    self.atos.fs_formatting(int(params[0]), int(params[1]))
+                else:
+                    print(colored('Wrong params', 'red'))
+            else:
+                self.atos.fs_formatting()
+            print('Formatting done.')
+        except exeptions.FSExeption as e:
+            print(colored(e, 'red'))
+
+    def help(self, params):
+        string = 'mkfile    [file name*]\n' \
+                 'mkdir     [directory name*]\n' \
+                 'rm        [file/directory name*]\n' \
+                 'mv        [source file name*, destination file name*]\n' \
+                 'cp        [source file name*, destination file name]\n' \
+                 'chmod     [owner permissions(0-7)|other permissions(0-7)*, file name*]\n' \
+                 'chattr    [file attributes(readonly, system, hidden)(0-7)*, file name*]\n' \
+                 'open      [file name*]\n' \
+                 'write     [file name*]\n' \
+                 'ls        [path]\n' \
+                 'pwd       []\n' \
+                 'cd        [path*]\n' \
+                 'mkuser    [login*, password*, role (0-1)*]\n' \
+                 'rmuser    [login*]\n' \
+                 'logout    []\n' \
+                 'fsformat  [HD size (20-1024)*, cluster size (512-32768)*]\n' \
+                 'clear     []'
+        print(string)
