@@ -40,10 +40,9 @@ class Atos:
         name, ext = self.parse_file_name(name)  # parse file name
         count = self.get_cluster_count(data)  # get required cluster's count
         clusters = self.get_free_clusters(count)    # get numbers of free clusters
-        self.write_record(File(name, ext, mod, clusters[0], self.user.id, data, attr), directory)
         self.set_cluster_engaged(clusters)
-        if data:
-            self.write_data(clusters, bytes(data, 'ansi'))
+        self.write_record(File(name, ext, mod, clusters[0], self.user.id, data, attr), directory)
+        self.write_data(clusters, bytes(data, 'ansi'))
 
     def remove_file(self, path):
         """Remove file or directory"""
@@ -66,7 +65,7 @@ class Atos:
             self.set_clusters_free(clusters)
 
     def move_file(self, source_path, target_path):
-        """Moves file"""
+        """Moves file (also rename)"""
         source_path, source_name = self.slice_path(source_path)
         source_file, source_directory = self.check_file_w_permission(source_path, source_name)
         target_path, target_name = self.slice_path(target_path)
@@ -78,6 +77,7 @@ class Atos:
         self.write_record(source_file, target_directory)
 
     def copy_file(self, source_full_path, target_full_path):
+        """Makes a copy of file or directory"""
         source_path, source_name = self.slice_path(source_full_path)
         source_file, source_directory = self.check_file_r_permission(source_path, source_name)
         self.check_dir_x_permission(source_path)    # check x permission
@@ -90,18 +90,18 @@ class Atos:
             target_name = self.get_copy_name(target_name, files)
         if source_file.is_dir():
             self.parse_file_name(target_name)  # check len of name and extension
-            self.make_file(target_full_path, source_file.mod, '', source_file.attr)
+            self.make_file(target_path + '/' + target_name, source_file.mod, '', source_file.attr)
             for file in self.read_directory(source_file).values():
-                source_path = source_full_path + '/' + file.full_name
-                target_path = target_full_path + '/' + file.full_name
+                new_source_path = source_full_path + '/' + file.full_name
+                new_target_path = target_path + '/' + target_name + '/' + file.full_name
                 try:
-                    self.copy_file(source_path, target_path)
+                    self.copy_file(new_source_path, new_target_path)
                 except exeptions.FSExeption as e:
-                    print(colored(e, 'red'))
+                    print(colored(source_full_path + ': Permission denied!', 'red'))
         else:
             data = self.read_file(source_file)
             self.parse_file_name(target_name)   # check len of name and extension
-            self.make_file(target_full_path, source_file.mod, str(data, 'ansi'), source_file.attr)
+            self.make_file(target_path + '/' + target_name, source_file.mod, str(data, 'ansi'), source_file.attr)
 
     def change_directory(self, path):
         """Changes user's location"""
@@ -190,39 +190,34 @@ class Atos:
         return str(self.read_file(file), encoding='ansi')
 
     def write(self, path, data):
+        """Writes data into file"""
         path, name = self.slice_path(path)
         file, directory = self.check_file_w_permission(path, name)
         clusters = self.get_clusters_seq(file.first_cluster)
-        req_clusters = math.ceil(len(data) / self.super_block.cluster_size)
-        if req_clusters == len(clusters):
-            file.modification_date = int(datetime.strftime(datetime.now(), "%Y%m%d%H%M%S"))
-            self.write_data(clusters, bytes(data, 'ansi'))
-            self.rewrite_record(file, directory)
-        elif req_clusters > len(clusters):
-            print('add clusters')
-        else:
-            print('remove clusters')
+        req_clusters_count = math.ceil(len(data) / self.super_block.cluster_size)
+        if req_clusters_count != len(clusters):
+            clusters = self.change_clusters_count(clusters, req_clusters_count)
+        file.modification_date = int(datetime.strftime(datetime.now(), "%Y%m%d%H%M%S"))
+        self.write_data(clusters, bytes(data, 'ansi'))
+        self.rewrite_record(file, directory)
 
     def append(self, path, data):
+        """Appends data to the end of the file"""
         path, name = self.slice_path(path)
         file, directory = self.check_file_w_permission(path, name)
         clusters = self.get_clusters_seq(file.first_cluster)
         old_data = self.read_file(file)
         old_data = old_data + b'\n' if old_data else old_data
         data = old_data + bytes(data, 'ansi')
-        req_clusters = math.ceil(len(data) / self.super_block.cluster_size)
-        if req_clusters == len(clusters):
-            file.modification_date = int(datetime.strftime(datetime.now(), "%Y%m%d%H%M%S"))
-            self.write_data(clusters, data)
-            self.rewrite_record(file, directory)
-        elif req_clusters > len(clusters):
-            # TODO add clusters
-            pass
-        else:
-            # TODO remove clusters
-            pass
+        req_clusters_count = math.ceil(len(data) / self.super_block.cluster_size)
+        if req_clusters_count != len(clusters):
+            clusters = self.change_clusters_count(clusters, req_clusters_count)
+        file.modification_date = int(datetime.strftime(datetime.now(), "%Y%m%d%H%M%S"))
+        self.write_data(clusters, data)
+        self.rewrite_record(file, directory)
 
     def fs_formatting(self, hd_size=256, cluster_size=4096):
+        """Format FS"""
         if 20 <= hd_size <= 1024 and (not cluster_size & (cluster_size - 1) and 512 <= cluster_size <= 32768):
             formatter = Formatting(hd_size, cluster_size)
             formatter.formatting()
@@ -233,6 +228,7 @@ class Atos:
     """System functions"""
 
     def write_permission(self, path):
+        """Check w permission for write append functions only"""
         path, name = self.slice_path(path)
         self.check_file_w_permission(path, name)
 
@@ -244,17 +240,12 @@ class Atos:
             while len(clusters) < count and file.tell() != self.super_block.fat_copy_offset:
                 if int.from_bytes(file.read(4), byteorder='big') == 0:
                     clusters.append(((file.tell() - self.super_block.fat_offset) // 4))
-                    self.clear_data_area((clusters[-1]-1) * self.super_block.cluster_size)
         if len(clusters) == count:
             return clusters
-        print(colored('Not enough memory!', 'red'))
-
-    def clear_data_area(self, offset):
-        with open('os.txt', 'r+b') as file:
-            file.seek(offset)
-            file.write(b' ' * self.super_block.cluster_size)
+        raise exeptions.FSExeption('Memory is out!')
 
     def get_clusters_seq(self, first_cluster):
+        """Returns clusters sequence of a file"""
         result = [first_cluster]
         with open('os.txt', 'rb') as file:
             file.seek(self.super_block.fat_offset + (first_cluster - 1) * 4)
@@ -298,6 +289,22 @@ class Atos:
                 # write in FAT copy
                 file.seek(self.super_block.fat_copy_offset + (cluster - 1) * 4)
                 file.write((0).to_bytes(4, byteorder='big'))
+
+    def change_clusters_count(self, clusters, req_clusters_count):
+        """Remove or add clusters to clusters sequence of a file. Returns clusters sequence"""
+        if req_clusters_count > len(clusters):
+            count = req_clusters_count - len(clusters)
+            clusters += self.get_free_clusters(count)
+            if len(clusters) >= 2:
+                self.set_cluster_engaged(clusters[-2:])
+            else:
+                self.set_cluster_engaged(clusters)
+        else:
+            count = len(clusters) - req_clusters_count
+            self.set_clusters_free(clusters[count:])
+            clusters = clusters[:count]
+            self.set_cluster_engaged(clusters)
+        return clusters
 
     def read_directory(self, f):
         """Returns a dict of files"""
@@ -360,7 +367,10 @@ class Atos:
                         offset = (clusters.pop(0) - 1) * self.super_block.cluster_size
                         file.seek(offset)
                     else:
-                        return None
+                        clusters = self.get_clusters_seq(directory.first_cluster)
+                        clusters = self.change_clusters_count(clusters, len(clusters) + 1)
+                        offset = (clusters[-1] - 1) * self.super_block.cluster_size
+                        file.seek(offset)
                 record = file.read(self.super_block.record_size)
                 if record[:1] == b' ':
                     file.seek(-self.super_block.record_size, 1)
@@ -368,7 +378,7 @@ class Atos:
                     return True
 
     def rewrite_record(self, f, directory):
-        """Write a file record"""
+        """Rewrite a file record"""
         clusters = self.get_clusters_seq(directory.first_cluster)
         with open('os.txt', 'r+b') as file:
             offset = (clusters.pop(0) - 1) * self.super_block.cluster_size
@@ -387,6 +397,7 @@ class Atos:
                     return True
 
     def remove_record(self, f, directory):
+        """Remove a file record"""
         clusters = self.get_clusters_seq(directory.first_cluster)
         with open('os.txt', 'r+b') as file:
             offset = (clusters.pop(0) - 1) * self.super_block.cluster_size
@@ -406,6 +417,7 @@ class Atos:
                     return True
 
     def write_data(self, clusters, data):
+        """Writes file's data into FS file"""
         with open('os.txt', 'r+b') as file:
             for cluster in clusters[:-1]:
                 file.seek((cluster - 1) * self.super_block.cluster_size)
@@ -426,6 +438,7 @@ class Atos:
         return users
 
     def save_users(self):
+        """Save list of users to FS file"""
         data = b''
         for user in self.users.values():
             data += user.get_user_bytes()
@@ -525,6 +538,7 @@ class Atos:
         return [full_path[:last_slash], full_path[last_slash+1:].strip()]    # return path and name
 
     def get_copy_name(self, target_name, files):
+        """Returns new name of copying file"""
         prefix = 1
         name, ext = self.parse_file_name(target_name)
         while files.get('(' + str(prefix) + ')' + target_name):
@@ -535,6 +549,7 @@ class Atos:
 
     @staticmethod
     def get_binary(rwx):
+        """Returns bin string of int number"""
         string = bin(rwx)[2:]
         if len(string) > 3:
             raise exeptions.FSExeption("Wrong params!")

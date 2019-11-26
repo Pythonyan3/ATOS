@@ -248,6 +248,6 @@ class Terminal:
                  'mkuser    [login*, password*, role (0-1)*]\n' \
                  'rmuser    [login*]\n' \
                  'logout    []\n' \
-                 'fsformat  [HD size (20-1024)*, cluster size (512-32768)*]\n' \
+                 'fsformat  [HD size (20-1024), cluster size (512-32768)]\n' \
                  'clear     []'
         print(string)
