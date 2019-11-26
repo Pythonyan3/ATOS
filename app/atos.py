@@ -70,7 +70,10 @@ class Atos:
         source_file, source_directory = self.check_file_w_permission(source_path, source_name)
         target_path, target_name = self.slice_path(target_path)
         target_directory = self.check_dir_w_permission(target_path)
-        if source_path != target_path and self.read_directory(target_directory).get(target_name):
+        if (target_path + '/').rfind(source_path + '/' + source_name + '/') > -1:
+            raise exeptions.FSExeption('Cannot move file into itself!')
+        files = self.read_directory(target_directory)
+        if (source_path != target_path or source_name != target_name) and files.get(target_name):
             raise exeptions.FSExeption('File with name "{}" is already exist!'.format(target_name))
         self.remove_record(source_file, source_directory)
         source_file.name, source_file.ext = self.parse_file_name(target_name)
@@ -83,21 +86,24 @@ class Atos:
         self.check_dir_x_permission(source_path)    # check x permission
         target_path, target_name = self.slice_path(target_full_path)
         target_directory = self.check_dir_w_permission(target_path)
+        if (target_path + '/').rfind(source_path + '/' + source_name + '/') > -1:
+            raise exeptions.FSExeption('Cannot copy file into itself!')
         files = self.read_directory(target_directory)
         if source_full_path != target_full_path and files.get(target_name):
             raise exeptions.FSExeption('File with name "{}" is already exist!'.format(target_name))
         elif source_full_path == target_full_path and files.get(target_name):
             target_name = self.get_copy_name(target_name, files)
         if source_file.is_dir():
+            files = self.read_directory(source_file).values()
             self.parse_file_name(target_name)  # check len of name and extension
             self.make_file(target_path + '/' + target_name, source_file.mod, '', source_file.attr)
-            for file in self.read_directory(source_file).values():
+            for file in files:
                 new_source_path = source_full_path + '/' + file.full_name
                 new_target_path = target_path + '/' + target_name + '/' + file.full_name
                 try:
                     self.copy_file(new_source_path, new_target_path)
                 except exeptions.FSExeption as e:
-                    print(colored(source_full_path + ': Permission denied!', 'red'))
+                    print(colored(e, 'red'))
         else:
             data = self.read_file(source_file)
             self.parse_file_name(target_name)   # check len of name and extension
@@ -135,6 +141,9 @@ class Atos:
         self.location = ''
         self.rwx, self.rsh, self.current_dir = self.get_directory(self.location)
         self.user = None
+
+    def users_list(self):
+        return [user for user in self.users.values() if user.id]
 
     def make_user(self, args):
         """Makes user account"""
@@ -497,7 +506,7 @@ class Atos:
         rwx = self.get_mod(file)
         r, w, x = self.get_binary(rwx)
         if r == '0' and not self.user.role:
-            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user.login.strip()))
+            raise exeptions.FSExeption('{}: Permission denied!'.format(file.full_name))
         return [file, directory]
 
     def check_dir_w_permission(self, path):
@@ -528,7 +537,7 @@ class Atos:
         rwx, rsh, directory = self.get_directory(path)  # get target directory
         r, w, x = self.get_binary(rwx)
         if x == '0' and not self.user.role:
-            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user.login.strip()))
+            raise exeptions.FSExeption('{}: Permission denied!'.format(directory.full_name))
         return directory
 
     def slice_path(self, path):

@@ -40,6 +40,7 @@ class Terminal:
             'cp': self.cp,
             'mkuser': self.mkuser,
             'rmuser': self.rmuser,
+            'users': self.users,
             'chmod': self.chmod,
             'chattr': self.chattr,
             'open': self.open,
@@ -117,6 +118,11 @@ class Terminal:
                 self.atos.remove_user(params[0])
             except exeptions.FSExeption as e:
                 print(colored(e, 'red'))
+
+    def users(self, params):
+        for user in self.atos.users_list():
+            role = 'superuser' if user.role else 'user'
+            print(str(user) + '\t' + role)
 
     def chmod(self, params):
         if len(params) == 2:
@@ -233,21 +239,22 @@ class Terminal:
             print(colored(e, 'red'))
 
     def help(self, params):
-        string = 'mkfile    [file name*]\n' \
-                 'mkdir     [directory name*]\n' \
-                 'rm        [file/directory name*]\n' \
-                 'mv        [source file name*, destination file name*]\n' \
-                 'cp        [source file name*, destination file name]\n' \
-                 'chmod     [owner permissions(0-7)|other permissions(0-7)*, file name*]\n' \
-                 'chattr    [file attributes(readonly, system, hidden)(0-7)*, file name*]\n' \
-                 'open      [file name*]\n' \
-                 'write     [file name*]\n' \
-                 'ls        [path]\n' \
-                 'pwd       []\n' \
-                 'cd        [path*]\n' \
-                 'mkuser    [login*, password*, role (0-1)*]\n' \
-                 'rmuser    [login*]\n' \
-                 'logout    []\n' \
-                 'fsformat  [HD size (20-1024), cluster size (512-32768)]\n' \
-                 'clear     []'
+        string = 'mkfile    make a new file     [file name*]\n' \
+                 'mkdir     make a new dir      [directory name*]\n' \
+                 'rm        remove file/dir     [file/directory name*]\n' \
+                 'mv        move file/dir       [source file name*, destination file name*]\n' \
+                 'cp        copy file/dir       [source file name*, destination file name]\n' \
+                 'chmod     change mode         [owner permissions(0-7)|other permissions(0-7)*, file name*]\n' \
+                 'chattr    change attributes   [file attributes(readonly, system, hidden)(0-7)*, file name*]\n' \
+                 'open      read file           [file name*]\n' \
+                 'write     write data          [file name*]\n' \
+                 'ls        show dir            [path]\n' \
+                 'pwd       show location       []\n' \
+                 'cd        change location     [path*]\n' \
+                 'mkuser    make new user       [login*, password*, role (0-1)*]\n' \
+                 'rmuser    remove user         [login*]\n' \
+                 'users     list of users       []\n' \
+                 'logout    logout              []\n' \
+                 'fsformat  format FS           [HD size (20-1024), cluster size (512-32768)]\n' \
+                 'clear     clear terminal      []'
         print(string)
