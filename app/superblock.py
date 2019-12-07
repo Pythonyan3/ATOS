@@ -10,12 +10,9 @@ class SuperBlock:
             self.__name = str(file.read(4), 'ansi')
             self.__cluster_size = int.from_bytes(file.read(2), byteorder='big')
             self.__clusters_count = int.from_bytes(file.read(4), byteorder='big')
-            self.__main_dir_size = int.from_bytes(file.read(4), byteorder='big')
             self.__hd_size = int.from_bytes(file.read(4), byteorder='big')
             self.__fat_offset = int.from_bytes(file.read(2), byteorder='big')
             self.__fat_copy_offset = int.from_bytes(file.read(4), byteorder='big')
-            self.__main_dir_offset = int.from_bytes(file.read(4), byteorder='big')
-            self.__data_area_offset = int.from_bytes(file.read(4), byteorder='big')
             self.__main_dir = File(file_bytes=file.read(self.record_size))
 
     @property
@@ -31,10 +28,6 @@ class SuperBlock:
         return self.__clusters_count
 
     @property
-    def main_dir_size(self):
-        return self.__main_dir_size
-
-    @property
     def hd_size(self):
         return self.__hd_size
 
@@ -45,14 +38,6 @@ class SuperBlock:
     @property
     def fat_copy_offset(self):
         return self.__fat_copy_offset
-
-    @property
-    def main_dir_offset(self):
-        return self.__main_dir_offset
-
-    @property
-    def data_area_offset(self):
-        return self.__data_area_offset
 
     @property
     def record_size(self):

@@ -4,7 +4,7 @@ from file import File
 import math
 
 
-class Formatting:
+class Formatter:
     """FS formatting class to file space allocation and making a super block"""
 
     # init super block fields
@@ -21,19 +21,17 @@ class Formatting:
         self.__main_dir_offset = self.__fat_copy_offset + self.__clusters_count * 4
         self.__data_area_offset = self.__main_dir_offset + self.__main_dir_size
         first_cluster = self.__main_dir_offset//self.__cluster_size+1
-        self.__main_dir = File(name='main_dir', mod='1111111', first_cluster=first_cluster, attr='000')
+        file = File(name='main_dir', mod='1111111', first_cluster=first_cluster, size=self.__main_dir_size)
+        self.__main_dir = file
 
     def mk_super_block(self):
         """Make a byte string of super block"""
         super_block = bytes(self.__name, 'ansi')
         super_block += self.__cluster_size.to_bytes(2, byteorder='big')
         super_block += self.__clusters_count.to_bytes(4, byteorder='big')
-        super_block += self.__main_dir_size.to_bytes(4, byteorder='big')
         super_block += self.__hd_size.to_bytes(4, byteorder='big')
         super_block += self.__fat_offset.to_bytes(2, byteorder='big')
         super_block += self.__fat_copy_offset.to_bytes(4, byteorder='big')
-        super_block += self.__main_dir_offset.to_bytes(4, byteorder='big')
-        super_block += self.__data_area_offset.to_bytes(4, byteorder='big')
         super_block += self.__main_dir.get_file_bytes()
         return super_block
 
@@ -54,7 +52,6 @@ class Formatting:
         sb = self.mk_super_block()
         sb = sb + b' ' * (self.__cluster_size - len(sb))
 
-        # file = File('users', '', '1111111', clusters[0], self.user.id, data, attr)
         data = b'root' + b' ' * 10 + hashlib.md5(b'314ton').digest() + (1).to_bytes(1, byteorder='big') + \
                (1).to_bytes(1, byteorder='big')
         clust, fat = self.mk_fat()

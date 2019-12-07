@@ -3,7 +3,7 @@ import math
 import os
 import hashlib
 import exeptions
-from formatting import Formatting
+from formatter import Formatter
 from user import User
 from termcolor import colored
 from superblock import SuperBlock
@@ -17,7 +17,6 @@ class Atos:
             self.fs_formatting()
         self.super_block = SuperBlock(os_path)
         self.location = ''
-        self.rwx, self.rsh, self.current_dir = self.get_directory(self.location)
         self.users = self.load_users()
         self.user = None
 
@@ -41,18 +40,19 @@ class Atos:
         count = self.get_cluster_count(data)  # get required cluster's count
         clusters = self.get_free_clusters(count)    # get numbers of free clusters
         self.set_cluster_engaged(clusters)
-        self.write_record(File(name, ext, mod, clusters[0], self.user.id, data, attr), directory)
+        size = len(data) if mod[0] == '0' else self.super_block.cluster_size * len(clusters)
+        self.write_record(File(name, ext, mod, clusters[0], self.user.id, attr, size), directory, path)
         self.write_data(clusters, bytes(data, 'ansi'))
 
     def remove_file(self, path):
         """Remove file or directory"""
-        full_path = self.path_conversion(path)
+        # full_path = self.path_conversion(path)
         path, name = self.slice_path(path)
         file, directory = self.check_file_w_permission(path, name)
         if file.is_dir():
             for f in self.read_directory(file).values():
                 try:
-                    self.remove_file(full_path + '/' + f.full_name.strip())
+                    self.remove_file(path + '/' + name + '/' + f.full_name.strip())
                 except exeptions.FSExeption:
                     print(colored('{}: Permission denied!'.format(f.full_name.strip()), 'red'))
             if not self.read_directory(file).values():
@@ -77,7 +77,7 @@ class Atos:
             raise exeptions.FSExeption('File with name "{}" is already exist!'.format(target_name))
         self.remove_record(source_file, source_directory)
         source_file.name, source_file.ext = self.parse_file_name(target_name)
-        self.write_record(source_file, target_directory)
+        self.write_record(source_file, target_directory, target_path)
 
     def copy_file(self, source_full_path, target_full_path):
         """Makes a copy of file or directory"""
@@ -94,6 +94,7 @@ class Atos:
         elif source_full_path == target_full_path and files.get(target_name):
             target_name = self.get_copy_name(target_name, files)
         if source_file.is_dir():
+            self.check_dir_x_permission(source_full_path)
             files = self.read_directory(source_file).values()
             self.parse_file_name(target_name)  # check len of name and extension
             self.make_file(target_path + '/' + target_name, source_file.mod, '', source_file.attr)
@@ -112,11 +113,10 @@ class Atos:
     def change_directory(self, path):
         """Changes user's location"""
         path = self.path_conversion(path)
-        directory = self.check_dir_x_permission(path)
-        self.current_dir = directory
+        self.check_dir_x_permission(path)
         self.location = path
 
-    def show_dir(self, path):
+    def show_directory(self, path):
         """Returns files of directory and x permission"""
         path = self.path_conversion(path)
         directory = self.check_dir_r_permission(path)
@@ -139,20 +139,19 @@ class Atos:
     def logout(self):
         """Logout"""
         self.location = ''
-        self.rwx, self.rsh, self.current_dir = self.get_directory(self.location)
         self.user = None
 
     def users_list(self):
         return [user for user in self.users.values() if user.id]
 
-    def make_user(self, args):
+    def make_user(self, login, password, role):
         """Makes user account"""
         if not self.user.role:
             raise exeptions.FSExeption('{}: Permission denied!'.format(self.user.login.strip()))
-        if self.users.get(args[0].strip()):
-            raise exeptions.FSExeption('User with login "{}", already exist!'.format(args[0].strip()))
-        password = hashlib.md5(bytes(args[1], 'ansi')).digest()
-        user = User(login=args[0].strip(), password=password, role=int(args[2]), id=len(self.users) + 1)
+        if self.users.get(login.strip()):
+            raise exeptions.FSExeption('User with login "{}", already exist!'.format(login.strip()))
+        password = hashlib.md5(bytes(password, 'ansi')).digest()
+        user = User(login=login.strip(), password=password, role=int(role), id=len(self.users) + 1)
         self.users[user.login.strip()] = user
         self.save_users()
 
@@ -207,6 +206,7 @@ class Atos:
         if req_clusters_count != len(clusters):
             clusters = self.change_clusters_count(clusters, req_clusters_count)
         file.modification_date = int(datetime.strftime(datetime.now(), "%Y%m%d%H%M%S"))
+        file.size = len(data)
         self.write_data(clusters, bytes(data, 'ansi'))
         self.rewrite_record(file, directory)
 
@@ -222,13 +222,14 @@ class Atos:
         if req_clusters_count != len(clusters):
             clusters = self.change_clusters_count(clusters, req_clusters_count)
         file.modification_date = int(datetime.strftime(datetime.now(), "%Y%m%d%H%M%S"))
+        file.size = len(data)
         self.write_data(clusters, data)
         self.rewrite_record(file, directory)
 
     def fs_formatting(self, hd_size=256, cluster_size=4096):
         """Format FS"""
         if 20 <= hd_size <= 1024 and (not cluster_size & (cluster_size - 1) and 512 <= cluster_size <= 32768):
-            formatter = Formatting(hd_size, cluster_size)
+            formatter = Formatter(hd_size, cluster_size)
             formatter.formatting()
             self.__init__()
         else:
@@ -244,8 +245,10 @@ class Atos:
     def get_free_clusters(self, count=1):
         """Getting numbers of free clusters. Return a list of free clusters numbers"""
         clusters = list()
+        main_dir_clusters_count = self.super_block.main_dir.size // self.super_block.cluster_size - 1
+        offset = self.super_block.fat_offset + (self.super_block.main_dir.first_cluster + main_dir_clusters_count) * 4
         with open('os.txt', 'r+b') as file:
-            file.seek(self.super_block.fat_offset)
+            file.seek(offset)
             while len(clusters) < count and file.tell() != self.super_block.fat_copy_offset:
                 if int.from_bytes(file.read(4), byteorder='big') == 0:
                     clusters.append(((file.tell() - self.super_block.fat_offset) // 4))
@@ -356,15 +359,15 @@ class Atos:
         files = self.read_directory(directory)
         for name in path_list:
             directory = files.get(name)
-            if directory:
+            if directory and directory.is_dir():
                 rwx = self.get_mod(directory) & rwx
                 rsh = self.get_attr(directory) | rsh
                 files = self.read_directory(directory)
             else:
-                raise exeptions.FSExeption('No such file or directory!')
+                raise exeptions.FSExeption('Directory not found!')
         return [rwx, rsh, directory]
 
-    def write_record(self, f, directory):
+    def write_record(self, f, directory, dir_path=''):
         """Write a file record"""
         clusters = self.get_clusters_seq(directory.first_cluster)
         with open('os.txt', 'r+b') as file:
@@ -378,6 +381,10 @@ class Atos:
                     else:
                         clusters = self.get_clusters_seq(directory.first_cluster)
                         clusters = self.change_clusters_count(clusters, len(clusters) + 1)
+                        p_path = dir_path[:dir_path.rfind('/')]
+                        p_dir = self.check_dir_w_permission(p_path)
+                        directory.size = directory.size + self.super_block.cluster_size
+                        self.rewrite_record(directory, p_dir)
                         offset = (clusters[-1] - 1) * self.super_block.cluster_size
                         file.seek(offset)
                 record = file.read(self.super_block.record_size)
@@ -534,6 +541,7 @@ class Atos:
 
     def check_dir_x_permission(self, path):
         """Raises exeption if target dir x permission denied else returns target dir"""
+        path = self.path_conversion(path)
         rwx, rsh, directory = self.get_directory(path)  # get target directory
         r, w, x = self.get_binary(rwx)
         if x == '0' and not self.user.role:

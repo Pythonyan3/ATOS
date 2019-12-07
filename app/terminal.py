@@ -1,16 +1,20 @@
-import hashlib
 import getpass
 import os
+import threading
+import time
 import atos
 import exeptions
 from file import File
 from termcolor import colored
+from Scheduler import Scheduler
 
 
 class Terminal:
 
     def __init__(self, path):
         self.atos = atos.Atos(path)
+        self.scheduler = Scheduler(self.atos.user)
+        self.thread = threading.Thread(target=self.scheduler.run, daemon=True)
 
     def run(self):
         while True:
@@ -50,6 +54,12 @@ class Terminal:
             'pwd': self.pwd,
             'cd': self.cd,
             'logout': self.logout,
+            'nice': self.nice,
+            'renice': self.renice,
+            'kill': self.kill,
+            'ps': self.ps,
+            'top': self.top,
+            'run': self.scheduler_run,
             'fsformat': self.formatting,
             'clear': self.clear,
             'help': self.help
@@ -106,7 +116,7 @@ class Terminal:
     def mkuser(self, params):
         if len(params) == 3 and params[2].isdigit():
             try:
-                self.atos.make_user(params)
+                self.atos.make_user(params[0], params[1], params[2])
             except exeptions.FSExeption as e:
                 print(colored(e, 'red'))
         else:
@@ -171,7 +181,7 @@ class Terminal:
 
     def ls(self, params):
         try:
-            files = self.atos.show_dir(params[0]) if params else self.atos.show_dir(self.atos.location)
+            files = self.atos.show_directory(params[0]) if params else self.atos.show_directory(self.atos.location)
             for file in files:
                 if type(file) == File:
                     color = 'magenta' if file.mod[0] == '1' else 'white'
@@ -198,10 +208,65 @@ class Terminal:
     def authorization(self):
         login = self.get_string(colored('Enter your login: ', 'white'))
         password = getpass.getpass('Enter your password: ')
-        return self.atos.login(login, password)
+        self.atos.login(login, password)
+        self.scheduler.user = self.atos.user
 
     def logout(self, params):
         self.atos.logout()
+
+    def nice(self, params):
+        try:
+            self.scheduler.nice(params[0], int(params[1]), int(params[2]))
+        except ValueError:
+            print(colored('Wrong params!', 'red'))
+        except IndexError:
+            print(colored('Wrong params!', 'red'))
+        except exeptions.FSExeption as e:
+            print(colored(e, 'red'))
+
+    def renice(self, params):
+        try:
+            self.scheduler.renice(int(params[0]), int(params[1]))
+        except ValueError:
+            print(colored('Wrong params!', 'red'))
+        except IndexError:
+            print(colored('Wrong params!', 'red'))
+        except exeptions.FSExeption as e:
+            print(colored(e, 'red'))
+
+    def kill(self, params):
+        try:
+            self.scheduler.kill(int(params[0]))
+        except ValueError:
+            print(colored('Wrong params!', 'red'))
+        except IndexError:
+            print(colored('Wrong params!', 'red'))
+        except exeptions.FSExeption as e:
+            print(colored(e, 'red'))
+
+    def ps(self, params):
+        print(self.scheduler.ps())
+
+    def top(self, params):
+        if params and len(params) == 1 and params[0].isdigit() and int(params[0]) >= 0:
+            duration = int(params[0])
+        else:
+            duration = 5
+        while True:
+            try:
+                self.clear(params)
+                print(self.scheduler.ps())
+                time.sleep(duration)
+            except KeyboardInterrupt:
+                break
+
+    def scheduler_run(self, params):
+        if not self.thread.is_alive():
+            self.thread = threading.Thread(target=self.scheduler.run, daemon=True)
+            self.thread.start()
+        else:
+            print(colored('Scheduler is already running!', 'red'))
+        # self.scheduler.run()
 
     @staticmethod
     def clear(params):
@@ -247,6 +312,7 @@ class Terminal:
                  'chmod     change mode         [owner permissions(0-7)|other permissions(0-7)*, file name*]\n' \
                  'chattr    change attributes   [file attributes(readonly, system, hidden)(0-7)*, file name*]\n' \
                  'open      read file           [file name*]\n' \
+                 'append    append data         [file name*]\n' \
                  'write     write data          [file name*]\n' \
                  'ls        show dir            [path]\n' \
                  'pwd       show location       []\n' \

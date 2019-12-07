@@ -3,30 +3,30 @@ from datetime import datetime
 
 class File:
 
-    def __init__(self, name='new_file', ext='', mod='0110100', first_cluster=1, uid=1, data='', attr='000', file_bytes=b''):
+    def __init__(self, name='', ext='', mod='0110100', first_cluster=1, uid=1, attr='000', size=0, file_bytes=b''):
         if file_bytes:
             self.parse_bytes(file_bytes)
         else:
             self.name = name + ' ' * (32 - len(name))
             self.ext = ext + ' ' * (5 - len(ext))
-            self.size = len(data)
+            self.size = size
             self.attr = attr
             self.mod = mod
             self.uid = uid
             self.creation_date = int(datetime.strftime(datetime.now(), "%Y%m%d%H%M%S"))
             self.modification_date = int(datetime.strftime(datetime.now(), "%Y%m%d%H%M%S"))
             self.first_cluster = first_cluster
-            self.data = data
 
     def __str__(self):
-        string = self.built_mod()
-        string += '    ' + self.built_attr()
-        string += '    ' + str(self.uid)
-        string += '    ' + self.built_date()
+        string = self.built_mod() + '\t'
+        string += self.built_attr() + '\t'
+        string += str(self.size) + '\t'
+        string += str(self.uid) + '\t'
+        string += self.built_date() + '\t'
         if self.ext.strip():
-            string += ' ' + self.name.strip() + '.' + self.ext.strip()
+            string += self.name.strip() + '.' + self.ext.strip()
         else:
-            string += ' ' + self.name.strip()
+            string += self.name.strip()
         return string
 
     @property
