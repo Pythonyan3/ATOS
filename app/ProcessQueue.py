@@ -1,12 +1,13 @@
 class ProcessQueue(list):
-    def __init__(self, quantum=5):
+    def __init__(self, number, quantum):
         super().__init__()
+        self.number = number
         self.quantum = quantum
 
-    def append(self, obj):
-        if not self:
-            super().append(obj)
-        else:
-            for i in range(len(self)):
-                if self[i].pri > obj.pri:
-                    self.insert(i, obj)
+    def append(self, process):
+        process.qid = self.number
+        for i in range(len(self)):
+            if self[i].pri > process.pri:
+                self.insert(i, process)
+                return None
+        super().append(process)

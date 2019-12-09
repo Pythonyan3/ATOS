@@ -1,7 +1,5 @@
 import math
 import random
-from itertools import repeat
-
 from process import Process
 from ProcessQueue import ProcessQueue
 import exeptions
@@ -11,35 +9,42 @@ import time
 class Scheduler:
     def __init__(self, user):
         self.user = user
-        self.queues = [ProcessQueue(4), ProcessQueue(8), ProcessQueue(16), ProcessQueue(math.inf), ProcessQueue(math.inf)]
-        self.removed = list()
+        self.queues = [ProcessQueue(0, 4), ProcessQueue(1, 8), ProcessQueue(2, 16),
+                       ProcessQueue(3, math.inf), ProcessQueue(4, math.inf)]
+        self.finished_processes = list()
         self.curr_queue, self.curr_process = None, None
         self.pid = 1
-        self.ticks = 0
+        self.pause = False
+        self.trace = list()
 
     def ps(self):
-        string = 'NAME\tUSER\tPID\tNICE\tSTATE\tBURST\tQUEUE'
-        for i in range(len(self.queues)):
-            for process in self.queues[i]:
-                string += '\n' + str(process) + '\t' + str(i)
-        return string
+        result = [''.join(map(lambda s: s.ljust(10), ('NAME', 'USER', 'PID', 'NICE', 'STATE', 'BURST', 'QUEUE')))]
+        for queue in self.queues:
+            for process in queue:
+                result.append(str(process))
+        result.append('\n')
+        return result
 
-    def run(self):
+    def run(self, delay):
         while True:
+            self.trace.extend(self.ps())
             self.curr_queue, self.curr_process = self.get_process()
-            if not self.curr_queue and not self.curr_process:
+            if not self.curr_queue and not self.curr_process or self.pause:
                 break
+            self.curr_process.state = 'E' if self.curr_process.state == 'R' else 'W'
             i = 0
             while i < self.curr_queue.quantum:
-                if self.curr_process.state == 'Z':
+                if self.pause or self.curr_process.state == 'Z':
                     break
-                self.quantum_tick()
+                time.sleep(delay)
+                self.tact()
                 i += 1
-                time.sleep(1)
                 if self.curr_process.cpu_burst == 0:
-                    self.kill(self.curr_process.pid)
+                    self.kill(self.curr_process.pid, True)
                     break
-                if self.check_displace():
+                if self.curr_process.state == 'W' or self.curr_process.state == 'R':
+                    break
+                if self.curr_process.state == 'E' and self.generate_waiting() or self.check_displace():
                     break
             else:
                 self.move_process_down()
@@ -47,28 +52,33 @@ class Scheduler:
     def nice(self, name, pri, burst):
         if not -20 <= pri <= 19 or burst <= 0:
             raise exeptions.FSExeption('Wrong params!')
-        process = Process(name, str(self.user), self.pid, pri, burst)
-        process.history = '-' * self.ticks
-        self.pid += 1
+        if pri < 0 and not self.user.role:
+            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user))
+        process = Process(name, self.user, self.pid, pri, burst)
         if self.user.role:
             self.queues[0].append(process)
         else:
             self.queues[1].append(process)
+        self.pid += 1
 
     def renice(self, pid, pri):
         if not -20 <= pri <= 19:
             raise exeptions.FSExeption('Wrong params!')
+        if pri < 0 and not self.user.role:
+            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user))
         process, queue = self.find(pid)
         self.check_permissions(process, queue)
-        process.priority = pri
-
-    def kill(self, pid):
-        process, queue = self.find(pid)
-        self.check_permissions(process, queue)
-        if process == self.curr_process:
-            self.curr_process.state = 'Z'
+        process.pri = pri
         queue.remove(process)
-        self.removed.append(process)
+        queue.append(process)
+
+    def kill(self, pid, su=False):
+        process, queue = self.find(pid)
+        if not su:
+            self.check_permissions(process, queue)
+        process.state = 'Z'
+        queue.remove(process)
+        self.finished_processes.append(process)
 
     def find(self, pid):
         process, queue = None, None
@@ -85,37 +95,47 @@ class Scheduler:
             return True
 
     def generate_waiting(self):
-        self.curr_process.state = 'W'
-        self.curr_process.wait_cpu_burst = random.randint(1, 5)
-        self.curr_queue.remove(self.curr_process)
-        self.queues[-1].append(self.curr_process)
+        if 1 <= random.randint(1, 100) <= 5:
+            self.curr_process.state = 'W'
+            self.curr_process.wait_cpu_burst = random.randint(1, 5)
+            self.curr_queue.remove(self.curr_process)
+            self.queues[-1].append(self.curr_process)
+            return True
 
     def move_process_down(self):
-        index = self.queues.index(self.curr_queue) + 1
         self.curr_queue.remove(self.curr_process)
-        self.queues[index].append(self.curr_process)
+        self.queues[self.curr_queue.number+1].append(self.curr_process)
         self.curr_process.state = 'R'
+
+    def move_process_up(self, process):
+        process.state = 'R'
+        self.queues[-1].remove(process)
+        if process.user.role:
+            self.queues[0].append(process)
+        else:
+            self.queues[1].append(process)
 
     def check_permissions(self, process, queue):
         if not process or not queue:
             raise exeptions.FSExeption('Process not found!')
-        if process.user != str(self.user) and not self.user.role:
+        if str(process.user) != str(self.user) and not self.user.role:
             raise exeptions.FSExeption('{}: Permission denied!'.format(self.user))
 
-    def quantum_tick(self):
+    def tact(self):
         for queue in self.queues:
-            queue = list(map(self.update_processes, queue))
-        self.ticks += 1
+            for process in queue:
+                if process.state == 'E':
+                    process.cpu_burst -= 1
+                if process.state == 'W':
+                    process.wait_cpu_burst -= 1
+                    if process.wait_cpu_burst == 0:
+                        self.move_process_up(process)
 
     def get_process(self):
         for queue in self.queues:
             for process in queue:
-                process.state = 'E' if process.state != 'W' else 'W'
                 return [queue, process]
         return [None, None]
 
-    @staticmethod
-    def update_processes(process):
-        if process.state == 'E':
-            process.cpu_burst -= 1
-        process.history += process.state
+    def tracing(self):
+        return self.trace

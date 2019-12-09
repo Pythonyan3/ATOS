@@ -6,6 +6,7 @@ import atos
 import exeptions
 from file import File
 from termcolor import colored
+from colorama import Fore, Back
 from Scheduler import Scheduler
 
 
@@ -59,7 +60,9 @@ class Terminal:
             'kill': self.kill,
             'ps': self.ps,
             'top': self.top,
-            'run': self.scheduler_run,
+            'planning': self.scheduler_run,
+            'plpause': self.scheduler_pause,
+            'trace': self.trace,
             'fsformat': self.formatting,
             'clear': self.clear,
             'help': self.help
@@ -245,7 +248,10 @@ class Terminal:
             print(colored(e, 'red'))
 
     def ps(self, params):
-        print(self.scheduler.ps())
+        process_list = self.scheduler.ps()
+        process_list[0] = Fore.BLACK + Back.WHITE + process_list[0] + Fore.RESET + Back.RESET
+        for s in process_list:
+            print(str(s))
 
     def top(self, params):
         if params and len(params) == 1 and params[0].isdigit() and int(params[0]) >= 0:
@@ -255,18 +261,31 @@ class Terminal:
         while True:
             try:
                 self.clear(params)
-                print(self.scheduler.ps())
+                process_list = self.scheduler.ps()
+                process_list[0] = Fore.BLACK + Back.WHITE + process_list[0] + Fore.RESET + Back.RESET
+                for s in process_list:
+                    print(str(s))
                 time.sleep(duration)
             except KeyboardInterrupt:
+                self.clear(params)
                 break
 
     def scheduler_run(self, params):
         if not self.thread.is_alive():
-            self.thread = threading.Thread(target=self.scheduler.run, daemon=True)
+            delay = 1 if (len(params) != 1 or not params[0].isdigit()) else float(params[0])
+            self.scheduler.pause = False
+            self.thread = threading.Thread(target=self.scheduler.run, args=(delay,), daemon=True)
             self.thread.start()
         else:
             print(colored('Scheduler is already running!', 'red'))
-        # self.scheduler.run()
+
+    def scheduler_pause(self, params):
+        self.scheduler.pause = True
+
+    def trace(self, params):
+        with open('trace.txt', 'w') as file:
+            for string in self.scheduler.tracing():
+                file.write(str(string) + '\n')
 
     @staticmethod
     def clear(params):
@@ -321,6 +340,14 @@ class Terminal:
                  'rmuser    remove user         [login*]\n' \
                  'users     list of users       []\n' \
                  'logout    logout              []\n' \
+                 'nice      create process      [name*, nice*, cpu burst*]\n' \
+                 'renice    change process pri  [PID*, nice*]\n' \
+                 'kill      kill process        [PID*]\n' \
+                 'ps        processes list      []\n' \
+                 'top       processes list      [delay]\n' \
+                 'planning  start planning      [delay]\n' \
+                 'plpause   pause planning      []\n' \
+                 'trace     write tracing       []\n' \
                  'fsformat  format FS           [HD size (20-1024), cluster size (512-32768)]\n' \
                  'clear     clear terminal      []'
         print(string)

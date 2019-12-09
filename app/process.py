@@ -1,22 +1,16 @@
 class Process:
-    def __init__(self, name, user_name, pid, pri, burst):
+    def __init__(self, name, user, pid, pri, burst, qid=0):
         self.name = name
-        self.user = user_name
+        self.user = user
         self.pid = pid
+        self.qid = qid
         self.state = 'R'
         self.cpu_burst = burst
         self.wait_cpu_burst = 0
         self.pri = pri
-        self.history = ''
 
     def __str__(self):
-        string = self.name + '\t' + self.user + '\t' + str(self.pid) + '\t' + \
-                 str(self.pri) + '\t' + self.state
-        if self.state == 'W':
-            string += '\t' + str(self.wait_cpu_burst)
-        else:
-            string += '\t' + str(self.cpu_burst)
-        return string
-
-    def is_waiting(self):
-        return not self.state
+        burst = str(self.cpu_burst) if self.state != 'W' else str(self.wait_cpu_burst)
+        fields = (self.name, str(self.user), str(self.pid), str(self.pri), self.state, burst, str(self.qid))
+        fields = [f.ljust(10) for f in fields]
+        return ''.join(fields)
