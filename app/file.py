@@ -18,15 +18,8 @@ class File:
             self.first_cluster = first_cluster
 
     def __str__(self):
-        string = self.built_mod() + '\t'
-        string += self.built_attr() + '\t'
-        string += str(self.size) + '\t'
-        string += str(self.uid) + '\t'
-        string += self.built_date() + '\t'
-        if self.ext.strip():
-            string += self.name.strip() + '.' + self.ext.strip()
-        else:
-            string += self.name.strip()
+        fields = (self.built_mod(), self.built_attr(), str(self.size), str(self.uid), self.built_date(), self.full_name)
+        string = '\t'.join(fields)
         return string
 
     @property
@@ -100,14 +93,6 @@ class File:
     @first_cluster.setter
     def first_cluster(self, first_cluster):
         self.__first_cluster = first_cluster
-
-    @property
-    def data(self):
-        return self.__data
-
-    @data.setter
-    def data(self, data):
-        self.__data = data
 
     @property
     def full_name(self):

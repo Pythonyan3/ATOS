@@ -21,54 +21,54 @@ class Terminal:
         while True:
             if self.atos.user:
                 label = colored(self.atos.user, 'green') + colored('~' + self.atos.location, 'blue') + ": "
-                string = self.get_string(label)
+                string = self.__get_string(label)
                 if string:
                     user_command = string.split(' ')
                     command = user_command.pop(0)
-                    function = self.commands(command)
+                    function = self.__commands(command)
                     if function:
                         function(list(filter(None, user_command)))
                     else:
                         print(colored('Unknown command!', 'red'))
             else:
                 try:
-                    self.authorization()
+                    self.__authorization()
                 except exeptions.FSExeption as e:
                     print(colored(e, 'red'))
 
-    def commands(self, command):
+    def __commands(self, command):
         return {
-            'mkfile': self.mkfile,
-            'mkdir': self.mkdir,
-            'rm': self.rm,
-            'mv': self.mv,
-            'cp': self.cp,
-            'mkuser': self.mkuser,
-            'rmuser': self.rmuser,
-            'users': self.users,
-            'chmod': self.chmod,
-            'chattr': self.chattr,
-            'open': self.open,
-            'write': self.write,
-            'append': self.append,
-            'ls': self.ls,
-            'pwd': self.pwd,
-            'cd': self.cd,
-            'logout': self.logout,
-            'nice': self.nice,
-            'renice': self.renice,
-            'kill': self.kill,
-            'ps': self.ps,
-            'top': self.top,
-            'planning': self.scheduler_run,
-            'plpause': self.scheduler_pause,
-            'trace': self.trace,
-            'fsformat': self.formatting,
-            'clear': self.clear,
-            'help': self.help
+            'mkfile': self.__mkfile,
+            'mkdir': self.__mkdir,
+            'rm': self.__rm,
+            'mv': self.__mv,
+            'cp': self.__cp,
+            'mkuser': self.__mkuser,
+            'rmuser': self.__rmuser,
+            'users': self.__users,
+            'chmod': self.__chmod,
+            'chattr': self.__chattr,
+            'open': self.__open,
+            'write': self.__write,
+            'append': self.__append,
+            'ls': self.__ls,
+            'pwd': self.__pwd,
+            'cd': self.__cd,
+            'logout': self.__logout,
+            'nice': self.__nice,
+            'renice': self.__renice,
+            'kill': self.__kill,
+            'ps': self.__ps,
+            'top': self.__top,
+            'planning': self.__scheduler_run,
+            'plpause': self.__scheduler_pause,
+            'trace': self.__trace,
+            'fsformat': self.__formatting,
+            'clear': self.__clear,
+            'help': self.__help
         }.get(command)
 
-    def mkfile(self, params):
+    def __mkfile(self, params):
         if not params:
             print(colored('Not enough params!', 'red'))
         for param in params:
@@ -77,7 +77,7 @@ class Terminal:
             except exeptions.FSExeption as e:
                 print(colored(e, 'red'))
 
-    def mkdir(self, params):
+    def __mkdir(self, params):
         if not params:
             print(colored('Not enough params!', 'red'))
         for param in params:
@@ -86,7 +86,7 @@ class Terminal:
             except exeptions.FSExeption as e:
                 print(colored(e, 'red'))
 
-    def rm(self, params):
+    def __rm(self, params):
         if not params:
             print(colored('Not enough params!', 'red'))
         for param in params:
@@ -95,7 +95,7 @@ class Terminal:
             except exeptions.FSExeption as e:
                 print(colored(e, 'red'))
 
-    def mv(self, params):
+    def __mv(self, params):
         if len(params) == 2:
             try:
                 self.atos.move_file(params[0], params[1])
@@ -104,7 +104,7 @@ class Terminal:
         else:
             print(colored('Wrong params!', 'red'))
 
-    def cp(self, params):
+    def __cp(self, params):
         if params:
             try:
                 if len(params) == 2:
@@ -116,7 +116,7 @@ class Terminal:
         else:
             print(colored('Wrong params!', 'red'))
 
-    def mkuser(self, params):
+    def __mkuser(self, params):
         if len(params) == 3 and params[2].isdigit():
             try:
                 self.atos.make_user(params[0], params[1], params[2])
@@ -125,19 +125,19 @@ class Terminal:
         else:
             print(colored('Wrong params!'))
 
-    def rmuser(self, params):
+    def __rmuser(self, params):
         if len(params) == 1:
             try:
                 self.atos.remove_user(params[0])
             except exeptions.FSExeption as e:
                 print(colored(e, 'red'))
 
-    def users(self, params):
+    def __users(self, params):
         for user in self.atos.users_list():
             role = 'superuser' if user.role else 'user'
             print(str(user) + '\t' + role)
 
-    def chmod(self, params):
+    def __chmod(self, params):
         if len(params) == 2:
             try:
                 self.atos.change_mod(params[1], params[0])
@@ -146,7 +146,7 @@ class Terminal:
         else:
             print(colored('Wrong params!', 'red'))
 
-    def chattr(self, params):
+    def __chattr(self, params):
         if len(params) == 2 and params[0].isdigit():
             try:
                 self.atos.change_attr(params[1], params[0])
@@ -155,7 +155,7 @@ class Terminal:
         else:
             print(colored('Wrong params!', 'red'))
 
-    def open(self, params):
+    def __open(self, params):
         if params:
             try:
                 data = self.atos.open(params[0])
@@ -166,23 +166,23 @@ class Terminal:
         else:
             print(colored('Not enough params!', 'red'))
 
-    def write(self, params):
+    def __write(self, params):
         try:
             self.atos.write_permission(params[0])
-            data = self.get_strings()
+            data = self.__get_strings()
             self.atos.write(params[0], data)
         except exeptions.FSExeption as e:
             print(colored(e, 'red'))
 
-    def append(self, params):
+    def __append(self, params):
         try:
             self.atos.write_permission(params[0])
-            data = self.get_strings()
+            data = self.__get_strings()
             self.atos.append(params[0], data)
         except exeptions.FSExeption as e:
             print(colored(e, 'red'))
 
-    def ls(self, params):
+    def __ls(self, params):
         try:
             files = self.atos.show_directory(params[0]) if params else self.atos.show_directory(self.atos.location)
             for file in files:
@@ -194,12 +194,12 @@ class Terminal:
         except exeptions.FSExeption as e:
             print(colored(e, 'red'))
 
-    def pwd(self, params):
+    def __pwd(self, params):
         path = self.atos.location
         path = path if path else '/'
         print(path)
 
-    def cd(self, params):
+    def __cd(self, params):
         try:
             if params and len(params) == 1:
                 self.atos.change_directory(params[0])
@@ -208,16 +208,16 @@ class Terminal:
         except exeptions.FSExeption as e:
             print(colored(e, 'red'))
 
-    def authorization(self):
-        login = self.get_string(colored('Enter your login: ', 'white'))
+    def __authorization(self):
+        login = self.__get_string(colored('Enter your login: ', 'white'))
         password = getpass.getpass('Enter your password: ')
         self.atos.login(login, password)
         self.scheduler.user = self.atos.user
 
-    def logout(self, params):
+    def __logout(self, params):
         self.atos.logout()
 
-    def nice(self, params):
+    def __nice(self, params):
         try:
             self.scheduler.nice(params[0], int(params[1]), int(params[2]))
         except ValueError:
@@ -227,7 +227,7 @@ class Terminal:
         except exeptions.FSExeption as e:
             print(colored(e, 'red'))
 
-    def renice(self, params):
+    def __renice(self, params):
         try:
             self.scheduler.renice(int(params[0]), int(params[1]))
         except ValueError:
@@ -237,7 +237,7 @@ class Terminal:
         except exeptions.FSExeption as e:
             print(colored(e, 'red'))
 
-    def kill(self, params):
+    def __kill(self, params):
         try:
             self.scheduler.kill(int(params[0]))
         except ValueError:
@@ -247,30 +247,30 @@ class Terminal:
         except exeptions.FSExeption as e:
             print(colored(e, 'red'))
 
-    def ps(self, params):
+    def __ps(self, params):
         process_list = self.scheduler.ps()
         process_list[0] = Fore.BLACK + Back.WHITE + process_list[0] + Fore.RESET + Back.RESET
         for s in process_list:
             print(str(s))
 
-    def top(self, params):
+    def __top(self, params):
         if params and len(params) == 1 and params[0].isdigit() and int(params[0]) >= 0:
             duration = int(params[0])
         else:
             duration = 5
         while True:
             try:
-                self.clear(params)
+                self.__clear(params)
                 process_list = self.scheduler.ps()
                 process_list[0] = Fore.BLACK + Back.WHITE + process_list[0] + Fore.RESET + Back.RESET
                 for s in process_list:
                     print(str(s))
                 time.sleep(duration)
             except KeyboardInterrupt:
-                self.clear(params)
+                self.__clear(params)
                 break
 
-    def scheduler_run(self, params):
+    def __scheduler_run(self, params):
         if not self.thread.is_alive():
             delay = 1 if (len(params) != 1 or not params[0].isdigit()) else float(params[0])
             self.scheduler.pause = False
@@ -279,20 +279,20 @@ class Terminal:
         else:
             print(colored('Scheduler is already running!', 'red'))
 
-    def scheduler_pause(self, params):
+    def __scheduler_pause(self, params):
         self.scheduler.pause = True
 
-    def trace(self, params):
+    def __trace(self, params):
         with open('trace.txt', 'w') as file:
             for string in self.scheduler.tracing():
                 file.write(str(string) + '\n')
 
     @staticmethod
-    def clear(params):
+    def __clear(params):
         os.system('cls')
 
     @staticmethod
-    def get_string(label):
+    def __get_string(label):
         while True:
             print(label, end='')
             text = input()
@@ -300,7 +300,7 @@ class Terminal:
                 return text.strip()
 
     @staticmethod
-    def get_strings():
+    def __get_strings():
         strings = list()
         while True:
             try:
@@ -309,7 +309,7 @@ class Terminal:
                 break
         return '\n'.join(strings)
 
-    def formatting(self, params):
+    def __formatting(self, params):
         try:
             if params:
                 if len(params) == 2 and params[0].isdigit() and params[1].isdigit():
@@ -322,7 +322,7 @@ class Terminal:
         except exeptions.FSExeption as e:
             print(colored(e, 'red'))
 
-    def help(self, params):
+    def __help(self, params):
         string = 'mkfile    make a new file     [file name*]\n' \
                  'mkdir     make a new dir      [directory name*]\n' \
                  'rm        remove file/dir     [file/directory name*]\n' \
