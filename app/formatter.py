@@ -1,6 +1,6 @@
 import hashlib
 
-from file import File
+from app.file import File
 import math
 
 
@@ -51,13 +51,12 @@ class Formatter:
         """Create file of FS and fill it"""
         sb = self.mk_super_block()
         sb = sb + b' ' * (self.__cluster_size - len(sb))
-
         data = b'root' + b' ' * 10 + hashlib.md5(b'314ton').digest() + (1).to_bytes(1, byteorder='big') + \
                (1).to_bytes(1, byteorder='big')
         clust, fat = self.mk_fat()
         f = File('users', '', '0110100', clust, 1, data, '111')
         try:
-            with open('os.txt', 'wb') as file:
+            with open('../os.txt', 'wb') as file:
                 file.write(sb)
                 file.write(fat * 2)
                 file.write(f.get_file_bytes() + b' ' * (self.__main_dir_size - len(f.get_file_bytes())))

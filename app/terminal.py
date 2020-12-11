@@ -1,19 +1,19 @@
+from app.atos import Atos
+from colorama import Fore, Back
+from termcolor import colored
+from app.file import File
+from app.fs_exception import FSExeption
 import getpass
 import os
+from app.Scheduler import Scheduler
 import threading
 import time
-import atos
-import exeptions
-from file import File
-from termcolor import colored
-from colorama import Fore, Back
-from Scheduler import Scheduler
 
 
 class Terminal:
 
     def __init__(self, path):
-        self.atos = atos.Atos(path)
+        self.atos = Atos(path)
         self.scheduler = Scheduler(self.atos.user)
         self.thread = threading.Thread(target=self.scheduler.run, daemon=True)
 
@@ -33,7 +33,7 @@ class Terminal:
             else:
                 try:
                     self.__authorization()
-                except exeptions.FSExeption as e:
+                except FSExeption as e:
                     print(colored(e, 'red'))
 
     def __commands(self, command):
@@ -74,7 +74,7 @@ class Terminal:
         for param in params:
             try:
                 self.atos.make_file(param)
-            except exeptions.FSExeption as e:
+            except FSExeption as e:
                 print(colored(e, 'red'))
 
     def __mkdir(self, params):
@@ -83,7 +83,7 @@ class Terminal:
         for param in params:
             try:
                 self.atos.make_file(path=param, mod='1111101')
-            except exeptions.FSExeption as e:
+            except FSExeption as e:
                 print(colored(e, 'red'))
 
     def __rm(self, params):
@@ -92,14 +92,14 @@ class Terminal:
         for param in params:
             try:
                 self.atos.remove_file(param)
-            except exeptions.FSExeption as e:
+            except FSExeption as e:
                 print(colored(e, 'red'))
 
     def __mv(self, params):
         if len(params) == 2:
             try:
                 self.atos.move_file(params[0], params[1])
-            except exeptions.FSExeption as e:
+            except FSExeption as e:
                 print(colored(e, 'red'))
         else:
             print(colored('Wrong params!', 'red'))
@@ -111,7 +111,7 @@ class Terminal:
                     self.atos.copy_file(params[0], params[1])
                 elif len(params) == 1:
                     self.atos.copy_file(params[0], params[0])
-            except exeptions.FSExeption as e:
+            except FSExeption as e:
                 print(colored(e, 'red'))
         else:
             print(colored('Wrong params!', 'red'))
@@ -120,7 +120,7 @@ class Terminal:
         if len(params) == 3 and params[2].isdigit():
             try:
                 self.atos.make_user(params[0], params[1], params[2])
-            except exeptions.FSExeption as e:
+            except FSExeption as e:
                 print(colored(e, 'red'))
         else:
             print(colored('Wrong params!'))
@@ -129,7 +129,7 @@ class Terminal:
         if len(params) == 1:
             try:
                 self.atos.remove_user(params[0])
-            except exeptions.FSExeption as e:
+            except FSExeption as e:
                 print(colored(e, 'red'))
 
     def __users(self, params):
@@ -141,7 +141,7 @@ class Terminal:
         if len(params) == 2:
             try:
                 self.atos.change_mod(params[1], params[0])
-            except exeptions.FSExeption as e:
+            except FSExeption as e:
                 print(colored(e, 'red'))
         else:
             print(colored('Wrong params!', 'red'))
@@ -150,7 +150,7 @@ class Terminal:
         if len(params) == 2 and params[0].isdigit():
             try:
                 self.atos.change_attr(params[1], params[0])
-            except exeptions.FSExeption as e:
+            except FSExeption as e:
                 print(colored(e, 'red'))
         else:
             print(colored('Wrong params!', 'red'))
@@ -161,7 +161,7 @@ class Terminal:
                 data = self.atos.open(params[0])
                 if data:
                     print(data)
-            except exeptions.FSExeption as e:
+            except FSExeption as e:
                 print(colored(e, 'red'))
         else:
             print(colored('Not enough params!', 'red'))
@@ -171,7 +171,7 @@ class Terminal:
             self.atos.write_permission(params[0])
             data = self.__get_strings()
             self.atos.write(params[0], data)
-        except exeptions.FSExeption as e:
+        except FSExeption as e:
             print(colored(e, 'red'))
 
     def __append(self, params):
@@ -179,7 +179,7 @@ class Terminal:
             self.atos.write_permission(params[0])
             data = self.__get_strings()
             self.atos.append(params[0], data)
-        except exeptions.FSExeption as e:
+        except FSExeption as e:
             print(colored(e, 'red'))
 
     def __ls(self, params):
@@ -191,7 +191,7 @@ class Terminal:
                     print(colored(file, color))
                 else:
                     print(file)
-        except exeptions.FSExeption as e:
+        except FSExeption as e:
             print(colored(e, 'red'))
 
     def __pwd(self, params):
@@ -205,7 +205,7 @@ class Terminal:
                 self.atos.change_directory(params[0])
             else:
                 print(colored('Wrong params!', 'red'))
-        except exeptions.FSExeption as e:
+        except FSExeption as e:
             print(colored(e, 'red'))
 
     def __authorization(self):
@@ -224,7 +224,7 @@ class Terminal:
             print(colored('Wrong params!', 'red'))
         except IndexError:
             print(colored('Wrong params!', 'red'))
-        except exeptions.FSExeption as e:
+        except FSExeption as e:
             print(colored(e, 'red'))
 
     def __renice(self, params):
@@ -234,7 +234,7 @@ class Terminal:
             print(colored('Wrong params!', 'red'))
         except IndexError:
             print(colored('Wrong params!', 'red'))
-        except exeptions.FSExeption as e:
+        except FSExeption as e:
             print(colored(e, 'red'))
 
     def __kill(self, params):
@@ -244,7 +244,7 @@ class Terminal:
             print(colored('Wrong params!', 'red'))
         except IndexError:
             print(colored('Wrong params!', 'red'))
-        except exeptions.FSExeption as e:
+        except FSExeption as e:
             print(colored(e, 'red'))
 
     def __ps(self, params):
@@ -283,7 +283,7 @@ class Terminal:
         self.scheduler.pause = True
 
     def __trace(self, params):
-        with open('trace.txt', 'w') as file:
+        with open('../trace.txt', 'w') as file:
             for string in self.scheduler.tracing():
                 file.write(str(string) + '\n')
 
@@ -319,7 +319,7 @@ class Terminal:
             else:
                 self.atos.fs_formatting()
             print('Formatting done.')
-        except exeptions.FSExeption as e:
+        except FSExeption as e:
             print(colored(e, 'red'))
 
     def __help(self, params):

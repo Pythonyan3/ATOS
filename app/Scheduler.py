@@ -1,8 +1,8 @@
+from app.fs_exception import FSExeption
 import math
+from app.process import Process
+from app.ProcessQueue import ProcessQueue
 import random
-from process import Process
-from ProcessQueue import ProcessQueue
-import exeptions
 import time
 
 
@@ -54,9 +54,9 @@ class Scheduler:
     def nice(self, name, pri, burst):
         """Make a new process"""
         if not -20 <= pri <= 19 or burst <= 0:
-            raise exeptions.FSExeption('Wrong params!')
+            raise FSExeption('Wrong params!')
         if pri < 0 and not self.user.role:
-            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user))
+            raise FSExeption('{}: Permission denied!'.format(self.user))
         process = Process(name, self.user, self.pid, pri, burst)
         if self.user.role:
             self.queues[0].append(process)
@@ -67,9 +67,9 @@ class Scheduler:
     def renice(self, pid, pri):
         """Changes process NICE"""
         if not -20 <= pri <= 19:
-            raise exeptions.FSExeption('Wrong params!')
+            raise FSExeption('Wrong params!')
         if pri < 0 and not self.user.role:
-            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user))
+            raise FSExeption('{}: Permission denied!'.format(self.user))
         process, queue = self.__find(pid)
         self.__check_permissions(process, queue)
         process.pri = pri
@@ -128,9 +128,9 @@ class Scheduler:
     def __check_permissions(self, process, queue):
         """Checks user permissions"""
         if not process or not queue:
-            raise exeptions.FSExeption('Process not found!')
+            raise FSExeption('Process not found!')
         if str(process.user) != str(self.user) and not self.user.role:
-            raise exeptions.FSExeption('{}: Permission denied!'.format(self.user))
+            raise FSExeption('{}: Permission denied!'.format(self.user))
 
     def __tact(self):
         """Does one tact. Change cpu_burst field of curr_process and waiting processes"""

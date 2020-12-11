@@ -1,3 +1,4 @@
-/app/os.txt
-/app/os1.txt
-/app/trace.txt
+/venv/
+/.idea/
+os.txt
+trace.txt
